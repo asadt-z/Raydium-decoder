@@ -1,1 +1,4 @@
 /target
+/src/libraries.rs
+/instruction-parser.ts
+/jupiter.ts
