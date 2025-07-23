@@ -1,11 +1,8 @@
-#![allow(warnings)]
-use borsh::BorshDeserialize;
-use hex::{self, decode};
+use smallvec::SmallVec;
 use std::env;
-use std::time::Instant; // for me only
+use std::time::Instant;
 
-#[derive(Debug)]
-// Pools
+#[derive(Debug, Clone, Copy)]
 enum PoolKind {
     Saber,
     SaberAddDecimalsDeposit,
@@ -102,206 +99,6 @@ enum PoolKind {
 }
 
 impl PoolKind {
-    fn get_kind_and_skip_bytes(id: u8) -> (Self, usize) {
-        let kind = match id {
-            0 => PoolKind::Saber,
-            1 => PoolKind::SaberAddDecimalsDeposit,
-            2 => PoolKind::SaberAddDecimalsWithdraw,
-            3 => PoolKind::TokenSwap,
-            4 => PoolKind::Sencha,
-            5 => PoolKind::Step,
-            6 => PoolKind::Cropper,
-            7 => PoolKind::Raydium,
-            8 => PoolKind::Crema,
-            9 => PoolKind::Lifinity,
-            10 => PoolKind::Mercurial,
-            11 => PoolKind::Cykura,
-            12 => PoolKind::Serum,
-            13 => PoolKind::MarinadeDeposit,
-            14 => PoolKind::MarinadeUnstake,
-            15 => PoolKind::Aldrin,
-            16 => PoolKind::AldrinV2,
-            17 => PoolKind::Whirlpool,
-            18 => PoolKind::Invariant,
-            19 => PoolKind::Meteora,
-            20 => PoolKind::GooseFX,
-            21 => PoolKind::DeltaFi,
-            22 => PoolKind::Balansol,
-            23 => PoolKind::MarcoPolo,
-            24 => PoolKind::Dradex,
-            25 => PoolKind::LifinityV2,
-            26 => PoolKind::RaydiumClmm,
-            27 => PoolKind::Openbook,
-            28 => PoolKind::Phoenix,
-            29 => PoolKind::Symmetry,
-            30 => PoolKind::TokenSwapV2,
-            31 => PoolKind::HeliumTreasuryManagementRedeemV0,
-            32 => PoolKind::StakeDexStakeWrappedSol,
-            33 => PoolKind::StakeDexSwapViaStake,
-            34 => PoolKind::GooseFXV2,
-            35 => PoolKind::Perps,
-            36 => PoolKind::PerpsAddLiquidity,
-            37 => PoolKind::PerpsRemoveLiquidity,
-            38 => PoolKind::MeteoraDlmm,
-            39 => PoolKind::OpenBookV2,
-            40 => PoolKind::RaydiumClmmV2,
-            41 => PoolKind::StakeDexPrefundWithdrawStakeAndDepositStake,
-            42 => PoolKind::Clone,
-            43 => PoolKind::SanctumS,
-            44 => PoolKind::SanctumSAddLiquidity,
-            45 => PoolKind::SanctumSRemoveLiquidity,
-            46 => PoolKind::RaydiumCP,
-            47 => PoolKind::WhirlpoolSwapV2,
-            48 => PoolKind::OneIntro,
-            49 => PoolKind::PumpdotfunWrappedBuy,
-            50 => PoolKind::PumpdotfunWrappedSell,
-            51 => PoolKind::PerpsV2,
-            52 => PoolKind::PerpsV2AddLiquidity,
-            53 => PoolKind::PerpsV2RemoveLiquidity,
-            54 => PoolKind::MoonshotWrappedBuy,
-            55 => PoolKind::MoonshotWrappedSell,
-            56 => PoolKind::StabbleStableSwap,
-            57 => PoolKind::StabbleWeightedSwap,
-            58 => PoolKind::Obric,
-            59 => PoolKind::FoxBuyFromEstimatedCost,
-            60 => PoolKind::FoxClaimPartial,
-            61 => PoolKind::SolFi,
-            62 => PoolKind::SolayerDelegateNoInit,
-            63 => PoolKind::SolayerUndelegateNoInit,
-            64 => PoolKind::TokenMill,
-            65 => PoolKind::DaosFunBuy,
-            66 => PoolKind::DaosFunSell,
-            67 => PoolKind::ZeroFi,
-            68 => PoolKind::StakeDexWithdrawWrappedSol,
-            69 => PoolKind::VirtualsBuy,
-            70 => PoolKind::VirtualsSell,
-            71 => PoolKind::Perena,
-            72 => PoolKind::PumpdotfunAmmBuy,
-            73 => PoolKind::PumpdotfunAmmSell,
-            74 => PoolKind::Gamma,
-            75 => PoolKind::MeteoraDlmmSwapV2,
-            76 => PoolKind::Woofi,
-            77 => PoolKind::MeteoraDammV2,
-            78 => PoolKind::MeteoraDynamicBondingCurveSwap,
-            79 => PoolKind::StabbleStableSwapV2,
-            80 => PoolKind::StabbleWeightedSwapV2,
-            81 => PoolKind::RaydiumLaunchlabBuy,
-            82 => PoolKind::RaydiumLaunchlabSell,
-            83 => PoolKind::BoopdotfunWrappedBuy,
-            84 => PoolKind::BoopdotfunWrappedSell,
-            85 => PoolKind::Plasma,
-            86 => PoolKind::GoonFi,
-            87 => PoolKind::HumidiFi,
-            88 => PoolKind::MeteoraDynamicBondingCurveSwapWithRemainingAccounts,
-            89 => PoolKind::TesseraV,
-            90 => PoolKind::RaydiumStable,
-            other => PoolKind::Unknown(other),
-        };
-
-        let skip = match kind {
-            PoolKind::Saber
-            | PoolKind::SaberAddDecimalsDeposit
-            | PoolKind::SaberAddDecimalsWithdraw
-            | PoolKind::TokenSwap
-            | PoolKind::Sencha
-            | PoolKind::Step
-            | PoolKind::Cropper
-            | PoolKind::Raydium
-            | PoolKind::Lifinity
-            | PoolKind::Mercurial
-            | PoolKind::Cykura
-            | PoolKind::MarinadeDeposit
-            | PoolKind::MarinadeUnstake
-            | PoolKind::Meteora
-            | PoolKind::GooseFX
-            | PoolKind::Balansol
-            | PoolKind::LifinityV2
-            | PoolKind::RaydiumClmm
-            | PoolKind::TokenSwapV2
-            | PoolKind::HeliumTreasuryManagementRedeemV0
-            | PoolKind::StakeDexStakeWrappedSol
-            | PoolKind::GooseFXV2
-            | PoolKind::Perps
-            | PoolKind::PerpsAddLiquidity
-            | PoolKind::PerpsRemoveLiquidity
-            | PoolKind::MeteoraDlmm
-            | PoolKind::RaydiumClmmV2
-            | PoolKind::RaydiumCP
-            | PoolKind::OneIntro
-            | PoolKind::PumpdotfunWrappedBuy
-            | PoolKind::PumpdotfunWrappedSell
-            | PoolKind::PerpsV2
-            | PoolKind::PerpsV2AddLiquidity
-            | PoolKind::PerpsV2RemoveLiquidity
-            | PoolKind::MoonshotWrappedBuy
-            | PoolKind::MoonshotWrappedSell
-            | PoolKind::StabbleStableSwap
-            | PoolKind::StabbleWeightedSwap
-            | PoolKind::FoxBuyFromEstimatedCost
-            | PoolKind::SolayerDelegateNoInit
-            | PoolKind::SolayerUndelegateNoInit
-            | PoolKind::DaosFunBuy
-            | PoolKind::DaosFunSell
-            | PoolKind::ZeroFi
-            | PoolKind::StakeDexWithdrawWrappedSol
-            | PoolKind::VirtualsBuy
-            | PoolKind::VirtualsSell
-            | PoolKind::PumpdotfunAmmBuy
-            | PoolKind::PumpdotfunAmmSell
-            | PoolKind::Gamma
-            | PoolKind::Woofi
-            | PoolKind::MeteoraDammV2
-            | PoolKind::MeteoraDynamicBondingCurveSwap
-            | PoolKind::StabbleStableSwapV2
-            | PoolKind::StabbleWeightedSwapV2
-            | PoolKind::BoopdotfunWrappedBuy
-            | PoolKind::BoopdotfunWrappedSell
-            | PoolKind::MeteoraDynamicBondingCurveSwapWithRemainingAccounts
-            | PoolKind::RaydiumStable
-            | PoolKind::PumpdotfunAmmSell => 0,
-
-            PoolKind::Crema
-            | PoolKind::Serum
-            | PoolKind::Aldrin
-            | PoolKind::AldrinV2
-            | PoolKind::Whirlpool
-            | PoolKind::Invariant
-            | PoolKind::DeltaFi
-            | PoolKind::MarcoPolo
-            | PoolKind::Dradex
-            | PoolKind::Openbook
-            | PoolKind::Phoenix
-            | PoolKind::StakeDexSwapViaStake
-            | PoolKind::OpenBookV2
-            | PoolKind::StakeDexPrefundWithdrawStakeAndDepositStake
-            | PoolKind::Obric
-            | PoolKind::FoxClaimPartial
-            | PoolKind::SolFi
-            | PoolKind::TokenMill
-            | PoolKind::MeteoraDlmmSwapV2
-            | PoolKind::RaydiumLaunchlabBuy
-            | PoolKind::RaydiumLaunchlabSell
-            | PoolKind::Plasma
-            | PoolKind::TesseraV => 1,
-
-            PoolKind::Symmetry
-            | PoolKind::SanctumSAddLiquidity
-            | PoolKind::SanctumSRemoveLiquidity
-            | PoolKind::WhirlpoolSwapV2
-            | PoolKind::Perena
-            | PoolKind::GoonFi
-            | PoolKind::HumidiFi => 2,
-
-            PoolKind::Clone => 3,
-
-            PoolKind::SanctumS => 4,
-
-            PoolKind::Unknown(_) => 0,
-        };
-
-        (kind, skip)
-    }
-
     fn is_target(&self) -> bool {
         matches!(
             self,
@@ -312,6 +109,103 @@ impl PoolKind {
         )
     }
 }
+
+const KIND_SKIPS: [(PoolKind, usize); 91] = [
+    (PoolKind::Saber, 0),
+    (PoolKind::SaberAddDecimalsDeposit, 0),
+    (PoolKind::SaberAddDecimalsWithdraw, 0),
+    (PoolKind::TokenSwap, 0),
+    (PoolKind::Sencha, 0),
+    (PoolKind::Step, 0),
+    (PoolKind::Cropper, 0),
+    (PoolKind::Raydium, 0),
+    (PoolKind::Crema, 1),
+    (PoolKind::Lifinity, 0),
+    (PoolKind::Mercurial, 0),
+    (PoolKind::Cykura, 0),
+    (PoolKind::Serum, 1),
+    (PoolKind::MarinadeDeposit, 0),
+    (PoolKind::MarinadeUnstake, 0),
+    (PoolKind::Aldrin, 1),
+    (PoolKind::AldrinV2, 1),
+    (PoolKind::Whirlpool, 1),
+    (PoolKind::Invariant, 1),
+    (PoolKind::Meteora, 0),
+    (PoolKind::GooseFX, 0),
+    (PoolKind::DeltaFi, 1),
+    (PoolKind::Balansol, 0),
+    (PoolKind::MarcoPolo, 1),
+    (PoolKind::Dradex, 1),
+    (PoolKind::LifinityV2, 0),
+    (PoolKind::RaydiumClmm, 0),
+    (PoolKind::Openbook, 1),
+    (PoolKind::Phoenix, 1),
+    (PoolKind::Symmetry, 2),
+    (PoolKind::TokenSwapV2, 0),
+    (PoolKind::HeliumTreasuryManagementRedeemV0, 0),
+    (PoolKind::StakeDexStakeWrappedSol, 0),
+    (PoolKind::StakeDexSwapViaStake, 1),
+    (PoolKind::GooseFXV2, 0),
+    (PoolKind::Perps, 0),
+    (PoolKind::PerpsAddLiquidity, 0),
+    (PoolKind::PerpsRemoveLiquidity, 0),
+    (PoolKind::MeteoraDlmm, 0),
+    (PoolKind::OpenBookV2, 1),
+    (PoolKind::RaydiumClmmV2, 0),
+    (PoolKind::StakeDexPrefundWithdrawStakeAndDepositStake, 1),
+    (PoolKind::Clone, 3),
+    (PoolKind::SanctumS, 4),
+    (PoolKind::SanctumSAddLiquidity, 2),
+    (PoolKind::SanctumSRemoveLiquidity, 2),
+    (PoolKind::RaydiumCP, 0),
+    (PoolKind::WhirlpoolSwapV2, 2),
+    (PoolKind::OneIntro, 0),
+    (PoolKind::PumpdotfunWrappedBuy, 0),
+    (PoolKind::PumpdotfunWrappedSell, 0),
+    (PoolKind::PerpsV2, 0),
+    (PoolKind::PerpsV2AddLiquidity, 0),
+    (PoolKind::PerpsV2RemoveLiquidity, 0),
+    (PoolKind::MoonshotWrappedBuy, 0),
+    (PoolKind::MoonshotWrappedSell, 0),
+    (PoolKind::StabbleStableSwap, 0),
+    (PoolKind::StabbleWeightedSwap, 0),
+    (PoolKind::Obric, 1),
+    (PoolKind::FoxBuyFromEstimatedCost, 0),
+    (PoolKind::FoxClaimPartial, 1),
+    (PoolKind::SolFi, 1),
+    (PoolKind::SolayerDelegateNoInit, 0),
+    (PoolKind::SolayerUndelegateNoInit, 0),
+    (PoolKind::TokenMill, 1),
+    (PoolKind::DaosFunBuy, 0),
+    (PoolKind::DaosFunSell, 0),
+    (PoolKind::ZeroFi, 0),
+    (PoolKind::StakeDexWithdrawWrappedSol, 0),
+    (PoolKind::VirtualsBuy, 0),
+    (PoolKind::VirtualsSell, 0),
+    (PoolKind::Perena, 2),
+    (PoolKind::PumpdotfunAmmBuy, 0),
+    (PoolKind::PumpdotfunAmmSell, 0),
+    (PoolKind::Gamma, 0),
+    (PoolKind::MeteoraDlmmSwapV2, 1),
+    (PoolKind::Woofi, 0),
+    (PoolKind::MeteoraDammV2, 0),
+    (PoolKind::MeteoraDynamicBondingCurveSwap, 0),
+    (PoolKind::StabbleStableSwapV2, 0),
+    (PoolKind::StabbleWeightedSwapV2, 0),
+    (PoolKind::RaydiumLaunchlabBuy, 1),
+    (PoolKind::RaydiumLaunchlabSell, 1),
+    (PoolKind::BoopdotfunWrappedBuy, 0),
+    (PoolKind::BoopdotfunWrappedSell, 0),
+    (PoolKind::Plasma, 1),
+    (PoolKind::GoonFi, 2),
+    (PoolKind::HumidiFi, 2),
+    (
+        PoolKind::MeteoraDynamicBondingCurveSwapWithRemainingAccounts,
+        0,
+    ),
+    (PoolKind::TesseraV, 1),
+    (PoolKind::RaydiumStable, 0),
+];
 
 #[derive(Debug)]
 enum PoolStep {
@@ -326,90 +220,103 @@ enum PoolStep {
 #[derive(Debug)]
 struct ParsedInstruction {
     not_needed: u64,
-    data_id: Option<u8>, // Sometimes it is not used
+    data_id: Option<u8>,
     data_length: u8,
-    no_need: [u8; 3], // 0,0,0
-    data: Vec<PoolStep>,
+    no_need: Option<[u8; 3]>,
+    data: SmallVec<[PoolStep; 8]>,
     in_amount: u64,
     quoted_out_amount: u64,
     slippage_bps: u16,
     platform_fee_bps: u8,
 }
 
-fn parse_pool_step(input: &mut &[u8], step: u8) -> Option<PoolStep> {
-    let pool_id = u8::deserialize(input).ok()?;
-
-    let (kind, skip) = PoolKind::get_kind_and_skip_bytes(pool_id);
-
-    if step == 1 && !kind.is_target() {
-        return None; // No in target in first swap - 404
+fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
+    let mut raw_bytes = vec![0; (hex_str.len() + 1) / 2]; // Safe size for odd lengths
+    if faster_hex::hex_decode(hex_str.as_bytes(), &mut raw_bytes).is_err() {
+        return None;
     }
 
-    // println!("{:?} with id :{:?}\n\n", kind, pool_id);
+    if raw_bytes.len() <= 40 {
+        return None;
+    }
 
-    // do not need to change slice
-    *input = &input[skip..];
+    let mut idx: usize = 0;
 
-    let percent = u8::deserialize(input).ok()?; //merge them
-    let input_index = u8::deserialize(input).ok()?;
-    let output_index = u8::deserialize(input).ok()?;
+    let not_needed = read_u64_le(&raw_bytes, &mut idx)?;
 
-    Some(PoolStep::Simple {
+    let (data_id, data_length) = if raw_bytes.get(idx + 1..idx + 4) == Some(&[0, 0, 0]) {
+        // No data_id, advance past the first byte (assuming it's the length or zero)
+        idx += 1; // Adjust if the slice get is off by one; test with data
+        (None, read_u8(&raw_bytes, &mut idx)?)
+    } else {
+        (
+            Some(read_u8(&raw_bytes, &mut idx)?),
+            read_u8(&raw_bytes, &mut idx)?,
+        )
+    };
+
+    //let no_need = read_array3_le(&raw_bytes, &mut idx)?;
+    let no_need = None;
+    idx += 3;
+
+    let data_length = if data_length == 0 { 1 } else { data_length };
+    let mut data: SmallVec<[PoolStep; 8]> = SmallVec::new();
+
+    // Manual first step with early exit
+    let pool_id = read_u8(&raw_bytes, &mut idx)?;
+    let (kind, skip) = if (pool_id as usize) < KIND_SKIPS.len() {
+        KIND_SKIPS[pool_id as usize]
+    } else {
+        (PoolKind::Unknown(pool_id), 0)
+    };
+
+    if !kind.is_target() {
+        return None; // No target in first swap
+    }
+
+    idx += skip;
+
+    let percent = read_u8(&raw_bytes, &mut idx)?;
+    let input_index = read_u8(&raw_bytes, &mut idx)?;
+    let output_index = read_u8(&raw_bytes, &mut idx)?;
+
+    data.push(PoolStep::Simple {
         kind,
         percent,
         input_index,
         output_index,
-    })
-}
+    });
 
-fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
-    let time = Instant::now();
-    let raw_bytes = hex::decode(hex_str).ok()?;
+    // Loop for remaining steps
+    for _ in 1..data_length {
+        let pool_id = read_u8(&raw_bytes, &mut idx)?;
+        let (kind, skip) = if (pool_id as usize) < KIND_SKIPS.len() {
+            KIND_SKIPS[pool_id as usize]
+        } else {
+            (PoolKind::Unknown(pool_id), 0)
+        };
 
-    //print!("Raw Bytes:{:?}\n\n", raw_bytes);
+        idx += skip;
 
-    let mut input = raw_bytes.as_slice();
+        let percent = read_u8(&raw_bytes, &mut idx)?;
+        let input_index = read_u8(&raw_bytes, &mut idx)?;
+        let output_index = read_u8(&raw_bytes, &mut idx)?;
 
-    if input.len() <= 13 {
-        return None;
+        data.push(PoolStep::Simple {
+            kind,
+            percent,
+            input_index,
+            output_index,
+        });
     }
-    //WHAT IS DATA IDW
-    let not_needed = u64::deserialize(&mut input).ok()?;
 
-    //Peek first byte after u64
-    let peek_next_3 = input.get(1..4)?;
+    let in_amount = read_u64_le(&raw_bytes, &mut idx)?;
+    let quoted_out_amount = read_u64_le(&raw_bytes, &mut idx)?;
+    let slippage_bps = read_u16_le(&raw_bytes, &mut idx)?;
+    let platform_fee_bps = read_u8(&raw_bytes, &mut idx)?;
 
-    let (data_id, data_length) = if peek_next_3 == [0, 0, 0] {
-        // No data_id
-        let data_length = u8::deserialize(&mut input).ok()?;
-        (None, data_length)
-    } else {
-        // We have data_id
-        let data_id = u8::deserialize(&mut input).ok()?;
-        let data_length = u8::deserialize(&mut input).ok()?;
-        (Some(data_id), data_length)
-    };
+    // Uncomment for debugging: println!("Parse time: {:?}", time.elapsed());
 
-    let no_need: [u8; 3] = <[u8; 3]>::deserialize(&mut input).ok()?; // 
-
-    let data_length = if data_length == 0 { 1 } else { data_length };
-
-    // let mut temp_input = input;
-    let first_step = parse_pool_step(&mut input, 1)?;
-
-    let mut data = Vec::with_capacity(data_length as usize);
-    data.push(first_step);
-
-    for i in 1..data_length {
-        let step = parse_pool_step(&mut input, i + 1)?;
-        data.push(step);
-    }
-    let in_amount = u64::deserialize(&mut input).ok()?; // merge steps
-    let quoted_out_amount = u64::deserialize(&mut input).ok()?;
-    let slippage_bps = u16::deserialize(&mut input).ok()?;
-    let platform_fee_bps = u8::deserialize(&mut input).ok()?;
-
-    println!("{:?}", time.elapsed());
     Some(ParsedInstruction {
         not_needed,
         data_id,
@@ -423,13 +330,34 @@ fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
     })
 }
 
+// Helper functions for manual reading (little-endian)
+fn read_u8(bytes: &[u8], idx: &mut usize) -> Option<u8> {
+    let val = *bytes.get(*idx)?;
+    *idx += 1;
+    Some(val)
+}
+
+fn read_u16_le(bytes: &[u8], idx: &mut usize) -> Option<u16> {
+    let slice = bytes.get(*idx..*idx + 2)?;
+    *idx += 2;
+    Some(u16::from_le_bytes([slice[0], slice[1]]))
+}
+
+fn read_u64_le(bytes: &[u8], idx: &mut usize) -> Option<u64> {
+    let slice = bytes.get(*idx..*idx + 8)?;
+    *idx += 8;
+    Some(u64::from_le_bytes([
+        slice[0], slice[1], slice[2], slice[3], slice[4], slice[5], slice[6], slice[7],
+    ]))
+}
+
 fn main() {
     let time = Instant::now();
 
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        println!("Usage: cargo run <argument>");
+        println!("Usage: cargo run --release -- <hex_string>");
         return;
     }
 
@@ -437,5 +365,5 @@ fn main() {
         Some(parsed) => println!("{:#?}", parsed),
         None => println!("No target pools found."),
     }
-    println!("{:?}", time.elapsed());
+    println!("Total time: {:?}", time.elapsed());
 }
