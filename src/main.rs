@@ -345,7 +345,7 @@ fn parse_pool_step(input: &mut &[u8], step: u8) -> Option<PoolStep> {
         return None; // No in target in first swap - 404
     }
 
-    println!("{:?} with id :{:?}\n\n", kind, pool_id);
+    // println!("{:?} with id :{:?}\n\n", kind, pool_id);
 
     // do not need to change slice
     *input = &input[skip..];
@@ -366,7 +366,7 @@ fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
     let time = Instant::now();
     let raw_bytes = hex::decode(hex_str).ok()?;
 
-    print!("Raw Bytes:{:?}\n\n", raw_bytes);
+    //print!("Raw Bytes:{:?}\n\n", raw_bytes);
 
     let mut input = raw_bytes.as_slice();
 
@@ -374,11 +374,9 @@ fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
         return None;
     }
     //WHAT IS DATA IDW
-
     let not_needed = u64::deserialize(&mut input).ok()?;
 
-    //Peel first byte after u64
-    let first_byte = *input.get(0)?;
+    //Peek first byte after u64
     let peek_next_3 = input.get(1..4)?;
 
     let (data_id, data_length) = if peek_next_3 == [0, 0, 0] {
@@ -396,8 +394,8 @@ fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
 
     let data_length = if data_length == 0 { 1 } else { data_length };
 
-    let mut temp_input = input;
-    let first_step = parse_pool_step(&mut temp_input, 1)?;
+    // let mut temp_input = input;
+    let first_step = parse_pool_step(&mut input, 1)?;
 
     let mut data = Vec::with_capacity(data_length as usize);
     data.push(first_step);
@@ -406,7 +404,6 @@ fn parse_jupiter_instruction(hex_str: &str) -> Option<ParsedInstruction> {
         let step = parse_pool_step(&mut input, i + 1)?;
         data.push(step);
     }
-
     let in_amount = u64::deserialize(&mut input).ok()?; // merge steps
     let quoted_out_amount = u64::deserialize(&mut input).ok()?;
     let slippage_bps = u16::deserialize(&mut input).ok()?;
